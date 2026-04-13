@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { _internals } from "../src/redditAnswers.js";
+import { RedditAnswersClient, _internals } from "../src/redditAnswers.js";
 
 test("parseChallenge extracts Reddit's current doubling challenge", () => {
   const html = `
@@ -59,4 +59,81 @@ data: {}
   assert.equal(events.length, 4);
   assert.equal(state.richtext.document[0].c[0].t, "Hello");
   assert.equal(state.followUps[0].query, "What next?");
+});
+
+test("runAnswerRequest retries once with forced refresh after a 401 even when token looked fresh", async () => {
+  const client = new RedditAnswersClient({
+    fetchImpl: async () => {
+      throw new Error("fetch should not be used in this test");
+    },
+  });
+
+  client._loaded = true;
+  client._token = "cached-token";
+  client._tokenExpiresAt = Date.now() + 10 * 60_000;
+
+  const ensureCalls = [];
+  client.ensureSession = async ({ forceRefresh = false } = {}) => {
+    ensureCalls.push(forceRefresh);
+  };
+
+  let callCount = 0;
+  client._callAnswersEndpoint = async () => {
+    callCount += 1;
+
+    if (callCount === 1) {
+      return new Response("unauthorized", { status: 401 });
+    }
+
+    return new Response(
+      `id: 1
+event: patch
+data: [{"op":"replace","path":"","value":{"comments":[],"followUps":[],"posts":[],"subreddits":[],"richtext":{"document":[{"e":"par","c":[{"e":"text","t":"Retried"}]}]}}}]
+
+id: 2
+event: success
+data: {}
+`,
+      {
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+      },
+    );
+  };
+
+  const result = await client._runAnswerRequest("11111111-1111-4111-8111-111111111111", "hello");
+
+  assert.deepEqual(ensureCalls, [false, true]);
+  assert.equal(callCount, 2);
+  assert.equal(result.success, true);
+  assert.equal(result.answerText, "Retried");
+});
+
+test("ensureSession serializes concurrent refreshes", async () => {
+  const client = new RedditAnswersClient({
+    fetchImpl: async () => {
+      throw new Error("fetch should not be used in this test");
+    },
+  });
+
+  client._loaded = true;
+
+  let mintCalls = 0;
+  client._mintTokenFromCookies = async () => {
+    mintCalls += 1;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    client._token = "fresh-token";
+    client._tokenExpiresAt = Date.now() + 10 * 60_000;
+    return true;
+  };
+  client._deriveTokenFromCookie = async () => false;
+  client._bootstrapSession = async () => {
+    throw new Error("bootstrap should not be needed");
+  };
+
+  const [first, second] = await Promise.all([client.ensureSession(), client.ensureSession()]);
+
+  assert.equal(mintCalls, 1);
+  assert.equal(first.ready, true);
+  assert.equal(second.ready, true);
 });

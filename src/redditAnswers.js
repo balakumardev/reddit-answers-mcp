@@ -390,6 +390,8 @@ export class RedditAnswersClient {
     this._token = null;
     this._tokenExpiresAt = null;
     this._loaded = false;
+    this._refreshPromise = null;
+    this._refreshPromiseForce = false;
   }
 
   async _loadSession() {
@@ -445,6 +447,11 @@ export class RedditAnswersClient {
 
   _hasFreshToken() {
     return Boolean(this._token && this._tokenExpiresAt && this._tokenExpiresAt - this._now() > 60_000);
+  }
+
+  _invalidateAccessToken() {
+    this._token = null;
+    this._tokenExpiresAt = null;
   }
 
   async _deriveTokenFromCookie() {
@@ -534,6 +541,33 @@ export class RedditAnswersClient {
     throw new Error("Unable to bootstrap a Reddit Answers session with any configured URL.");
   }
 
+  async _refreshSession(forceRefresh) {
+    if (!forceRefresh && this._hasFreshToken()) {
+      return;
+    }
+
+    if (forceRefresh) {
+      this._invalidateAccessToken();
+
+      if (await this._mintTokenFromCookies()) {
+        return;
+      }
+
+      await this._bootstrapSession();
+      return;
+    }
+
+    if (await this._mintTokenFromCookies()) {
+      return;
+    }
+
+    if (await this._deriveTokenFromCookie()) {
+      return;
+    }
+
+    await this._bootstrapSession();
+  }
+
   async ensureSession({ forceRefresh = false } = {}) {
     await this._loadSession();
 
@@ -541,17 +575,23 @@ export class RedditAnswersClient {
       return this.getStatus();
     }
 
-    if (!forceRefresh) {
-      if (await this._mintTokenFromCookies()) {
-        return this.getStatus();
+    if (this._refreshPromise) {
+      if (forceRefresh && !this._refreshPromiseForce) {
+        await this._refreshPromise;
+        return this.ensureSession({ forceRefresh: true });
       }
 
-      if (await this._deriveTokenFromCookie()) {
-        return this.getStatus();
-      }
+      await this._refreshPromise;
+      return this.getStatus();
     }
 
-    await this._bootstrapSession();
+    this._refreshPromiseForce = forceRefresh;
+    this._refreshPromise = this._refreshSession(forceRefresh).finally(() => {
+      this._refreshPromise = null;
+      this._refreshPromiseForce = false;
+    });
+
+    await this._refreshPromise;
     return this.getStatus();
   }
 
@@ -600,7 +640,8 @@ export class RedditAnswersClient {
 
     let response = await this._callAnswersEndpoint(answerId, query);
 
-    if ((response.status === 401 || response.status === 403) && !this._hasFreshToken()) {
+    if (response.status === 401 || response.status === 403) {
+      await response.text().catch(() => {});
       await this.ensureSession({ forceRefresh: true });
       response = await this._callAnswersEndpoint(answerId, query);
     }
