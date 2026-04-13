@@ -51,8 +51,8 @@ jobs:
           git config user.email "mail@balakumar.dev"
           git add package.json package-lock.json
           git commit -m "chore(release): ${TAG} [skip ci]"
-          git tag "${TAG}"
-          git push origin "HEAD:${GITHUB_REF_NAME}" --follow-tags
+          git tag -a "${TAG}" -m "${TAG}"
+          git push origin "HEAD:${GITHUB_REF_NAME}" "${TAG}"
 
       - name: Publish package to npm
         run: npm publish --access public --provenance
