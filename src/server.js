@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 
+import { createRequire } from "node:module";
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as z from "zod";
 
 import { RedditAnswersClient, formatAnswerResult, formatSessionStatus } from "./redditAnswers.js";
+
+const require = createRequire(import.meta.url);
+const packageJson = require("../package.json");
 
 const answerOutputSchema = {
   answerId: z.string().uuid(),
@@ -35,8 +40,8 @@ const statusOutputSchema = {
 
 const client = new RedditAnswersClient();
 const server = new McpServer({
-  name: "reddit-answers",
-  version: "1.0.0",
+  name: packageJson.name,
+  version: packageJson.version,
 });
 
 server.registerTool(

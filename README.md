@@ -102,14 +102,19 @@ npm start
 This repo includes:
 
 - GitHub CI at `.github/workflows/ci.yml`
-- npm publish workflow at `.github/workflows/publish.yml`
+- automated release + npm publish workflow at `.github/workflows/publish.yml`
 
-Publish flow:
+Release flow:
 
 1. Add a repository secret named `NPM_TOKEN` with an npm automation token.
-2. Bump the package version.
-3. Push a tag like `v1.0.1`.
-4. GitHub Actions will run tests and publish the package to npm.
+2. Push any commit to `main` or `master`.
+3. GitHub Actions will:
+   Run `npm test`.
+   Bump the patch version in `package.json` and `package-lock.json`.
+   Commit the new version back to the branch.
+   Create and push a git tag.
+   Publish the package to npm.
+   Create a GitHub release with generated notes.
 
 Once published, the package will be runnable with:
 

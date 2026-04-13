@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - main
+      - master
   pull_request:
 
 jobs:
   test:
+    if: github.event_name == 'pull_request' || !startsWith(github.event.head_commit.message, 'chore(release):')
     runs-on: ubuntu-latest
 
     steps:
