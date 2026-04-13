@@ -1,0 +1,10 @@
+# BEGIN claude-to-codex-sync managed MCP servers
+
+[mcp_servers."chrome-devtools"]
+command = "npx"
+args = ["-y", "chrome-devtools-mcp@latest", "--isolated"]
+
+[mcp_servers."reddit-answers"]
+command = "node"
+args = ["src/server.js"]
+# END claude-to-codex-sync managed MCP servers

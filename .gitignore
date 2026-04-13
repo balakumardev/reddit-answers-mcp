@@ -1,0 +1,9 @@
+# Chrome Debug Profile
+.chrome-debug/
+node_modules/
+.agents/
+.augment/
+.claude/
+.cursor/
+.windsurf/
+npm-debug.log*
