@@ -1,6 +1,6 @@
 {
   "name": "reddit-answers-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Browserless MCP server for Reddit Answers with plain-HTTP challenge solving and token reuse.",
   "type": "module",
   "main": "./src/server.js",
