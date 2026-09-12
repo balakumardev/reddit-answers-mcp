@@ -75,7 +75,10 @@ function isChallengePage(html) {
 }
 
 function parseChallenge(html, requestUrl) {
-  const token = html.match(/name="token"\s+value="([^"]+)"/i)?.[1];
+  // Reddit changed the token field name from "token" to "jsc_token"
+  const tokenMatch = html.match(/name="(jsc_token|token)"\s+value="([^"]+)"/i);
+  const token = tokenMatch?.[2];
+  const tokenParamName = tokenMatch?.[1] ?? "token";
   const formAction = html.match(/<form[^>]*action="([^"]+)"/i)?.[1];
   const seed = html.match(/await\s*\(\s*async\s+([a-zA-Z_$][\w$]*)\s*=>\s*\1\s*\+\s*\1\s*\)\s*\(\s*"([^"]+)"\s*\)/)?.[2];
 
@@ -94,7 +97,7 @@ function parseChallenge(html, requestUrl) {
 
   solvedUrl.searchParams.set("solution", `${seed}${seed}`);
   solvedUrl.searchParams.set("js_challenge", "1");
-  solvedUrl.searchParams.set("token", token);
+  solvedUrl.searchParams.set(tokenParamName, token);
 
   return {
     seed,
